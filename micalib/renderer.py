@@ -23,6 +23,7 @@ from pytorch3d.renderer import (
     FoVPerspectiveCameras, look_at_view_transform,
     RasterizationSettings, MeshRenderer, MeshRasterizer, SoftPhongShader, TexturesVertex
 )
+from alfred import device
 
 
 class MeshShapeRenderer(nn.Module):
@@ -30,11 +31,11 @@ class MeshShapeRenderer(nn.Module):
         super().__init__()
 
         verts, faces, aux = load_obj(obj_filename)
-        faces = faces.verts_idx[None, ...].cuda()
+        faces = faces.verts_idx[None, ...].to(device)
         self.register_buffer('faces', faces)
 
         R, T = look_at_view_transform(2.7, 10.0, 10.0)
-        self.cameras = FoVPerspectiveCameras(device='cuda:0', R=R, T=T, fov=6)
+        self.cameras = FoVPerspectiveCameras(device=device, R=R, T=T, fov=6)
         raster_settings = RasterizationSettings(
             image_size=512,
             blur_radius=0.0,
@@ -43,7 +44,7 @@ class MeshShapeRenderer(nn.Module):
         )
 
         lights = pytorch3d.renderer.DirectionalLights(
-            device='cuda:0',
+            device=device,
             direction=((0, 0, 1),),
             ambient_color=((0.4, 0.4, 0.4),),
             diffuse_color=((0.35, 0.35, 0.35),),
@@ -51,7 +52,7 @@ class MeshShapeRenderer(nn.Module):
 
         self.renderer = MeshRenderer(
             rasterizer=MeshRasterizer(cameras=self.cameras, raster_settings=raster_settings),
-            shader=SoftPhongShader(device='cuda:0', cameras=self.cameras, lights=lights)
+            shader=SoftPhongShader(device=device, cameras=self.cameras, lights=lights)
         )
 
     def render_mesh(self, vertices, faces=None, verts_rgb=None):
@@ -63,7 +64,7 @@ class MeshShapeRenderer(nn.Module):
 
         if verts_rgb is None:
             verts_rgb = torch.ones_like(vertices)
-        textures = TexturesVertex(verts_features=verts_rgb.cuda())
+        textures = TexturesVertex(verts_features=verts_rgb.to(device))
         meshes = pytorch3d.structures.Meshes(verts=vertices, faces=faces, textures=textures)
 
         rendering = self.renderer(meshes).permute(0, 3, 1, 2)

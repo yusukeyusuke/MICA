@@ -36,6 +36,7 @@ from tqdm import tqdm
 from configs.config import get_cfg_defaults
 from datasets.creation.util import get_arcface_input, get_center
 from utils import util
+from alfred import device
 
 
 def deterministic(rank):
@@ -83,16 +84,16 @@ def to_batch(path):
     image = imread(src)[:, :, :3]
     image = image / 255.
     image = cv2.resize(image, (224, 224)).transpose(2, 0, 1)
-    image = torch.tensor(image).cuda()[None]
+    image = torch.tensor(image).to(device)[None]
 
     arcface = np.load(path)
-    arcface = torch.tensor(arcface).cuda()[None]
+    arcface = torch.tensor(arcface).to(device)[None]
 
     return image, arcface
 
 
 def load_checkpoint(args, mica):
-    checkpoint = torch.load(args.m)
+    checkpoint = torch.load(args.m, map_location='cpu')
     if 'arcface' in checkpoint:
         mica.arcface.load_state_dict(checkpoint['arcface'])
     if 'flameModel' in checkpoint:
@@ -100,7 +101,8 @@ def load_checkpoint(args, mica):
 
 
 def main(cfg, args):
-    device = 'cuda:0'
+    # device = 'cuda:0'
+    device = 'cpu'
     cfg.model.testing = True
     mica = util.find_model_using_name(model_dir='micalib.models', model_name=cfg.model.name)(cfg, device)
     load_checkpoint(args, mica)
@@ -109,7 +111,7 @@ def main(cfg, args):
     faces = mica.render.faces[0].cpu()
     Path(args.o).mkdir(exist_ok=True, parents=True)
 
-    app = FaceAnalysis(name='antelopev2', providers=['CUDAExecutionProvider'])
+    app = FaceAnalysis(name='buffalo_l', providers=['CUDAExecutionProvider'])
     app.prepare(ctx_id=0, det_size=(224, 224))
 
     with torch.no_grad():
